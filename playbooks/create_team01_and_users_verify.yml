@@ -1,0 +1,125 @@
+---
+- name: Create RACF group TEAM01 and users
+  hosts: zoslab
+  gather_facts: false
+
+  environment: "{{ environment_vars }}"
+
+  collections:
+    - ibm.ibm_zos_core
+
+  vars:
+    racf_group: TEAM01
+    group_owner: IBMUSER
+    default_password: NEWPASS
+
+    users:
+      - userid: USER01
+        name: "Development User 01"
+
+      - userid: USER02
+        name: "Development User 02"
+
+      - userid: USER03
+        name: "Development User 03"
+
+  tasks:
+    - name: Check whether RACF group TEAM01 exists
+      ibm.ibm_zos_core.zos_tso_command:
+        commands:
+          - "LISTGRP {{ racf_group }}"
+        max_rc: 8
+      register: group_check
+      changed_when: false
+      failed_when: false
+
+    - name: Create RACF group TEAM01
+      ibm.ibm_zos_core.zos_tso_command:
+        commands:
+          - "ADDGROUP {{ racf_group }} OWNER({{ group_owner }})"
+        max_rc: 4
+      when:
+        - group_check.output is defined
+        - group_check.output | length > 0
+        - group_check.output[0].rc | int != 0
+      register: group_create_result
+
+    - name: Check whether RACF users exist
+      ibm.ibm_zos_core.zos_tso_command:
+        commands:
+          - "LISTUSER {{ item.userid }}"
+        max_rc: 8
+      loop: "{{ users }}"
+      loop_control:
+        label: "{{ item.userid }}"
+      register: user_checks
+      changed_when: false
+      failed_when: false
+
+    - name: Create missing RACF users
+      ibm.ibm_zos_core.zos_tso_command:
+        commands:
+          - >-
+            ADDUSER {{ item.item.userid }}
+            NAME('{{ item.item.name }}')
+            OWNER({{ racf_group }})
+            DFLTGRP({{ racf_group }})
+            PASSWORD({{ default_password }})
+        max_rc: 4
+      loop: "{{ user_checks.results }}"
+      loop_control:
+        label: "{{ item.item.userid }}"
+      when:
+        - item.output is defined
+        - item.output | length > 0
+        - item.output[0].rc | int != 0
+      register: user_create_results
+
+    - name: Connect users to TEAM01
+      ibm.ibm_zos_core.zos_tso_command:
+        commands:
+          - "CONNECT {{ item.userid }} GROUP({{ racf_group }})"
+        max_rc: 4
+      loop: "{{ users }}"
+      loop_control:
+        label: "Connect {{ item.userid }} to {{ racf_group }}"
+      failed_when: false
+      register: connect_results
+
+    - name: Display group result
+      ansible.builtin.debug:
+        msg: "RACF group {{ racf_group }} is present."
+
+    - name: Display user results
+      ansible.builtin.debug:
+        msg: "RACF user {{ item.userid }} was processed."
+      loop: "{{ users }}"
+      loop_control:
+        label: "{{ item.userid }}"
+
+    ####################################################################
+    # Verification Section
+    ####################################################################
+
+    - name: Verify TEAM01
+      ibm.ibm_zos_core.zos_tso_command:
+        commands:
+          - "LISTGRP {{ racf_group }}"
+      register: grp
+
+    - name: Display TEAM01 information
+      ansible.builtin.debug:
+        var: grp.output
+
+    - name: Verify RACF users
+      ibm.ibm_zos_core.zos_tso_command:
+        commands:
+          - "LISTUSER USER01"
+          - "LISTUSER USER02"
+          - "LISTUSER USER03"
+      register: verify_users
+
+    - name: Display USER01, USER02, and USER03 information
+      ansible.builtin.debug:
+        var: verify_users.output
+        
