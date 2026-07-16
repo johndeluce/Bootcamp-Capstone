@@ -34,6 +34,7 @@
         environments:
           - DEV
           - TEST
+        libraries: "{{ user_hlqs | product(environments) | list }}"
 
     - name: Run Master Playbook for Roles
       ansible.builtin.include_tasks: roles-master-playbook.yml
