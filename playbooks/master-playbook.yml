@@ -1,0 +1,22 @@
+---
+- name: Master Playbook for Ansible
+  hosts: zoslab
+  tasks:
+    - name: Bootstrap message
+      ansible.builtin.debug:
+        msg: "Starting master playbook --"
+
+    - name: Ping ZOS
+      ansible.builtin.include_tasks: zos_ping.yml
+
+    - name: Create Team, Users, and Verify
+      ansible.builtin.include_tasks: create_team01_and_users_verify.yml
+
+    - name: Create Dev and Test Libraries
+      ansible.builtin.include_tasks: create_dev_test_libraries.yml
+
+    - name: Run Master Playbook for Roles
+      ansible.builtin.include_tasks: roles-master-playbook.yml
+
+    - name: Submit JCL
+      ansible.builtin.include_tasks: submit_local_jcl.yml
